@@ -17,12 +17,13 @@ class dashboard::params {
   $dashboard_group       = 'puppet-dashboard'
   $dashboard_password    = 'changeme'
   $dashboard_db          = 'dashboard_production'
+  $dashboard_db_host     = 'localhost'
   $dashboard_charset     = 'utf8'
   $dashboard_environment = 'production'
   $dashboard_site        = $::fqdn
   $dashboard_port        = '8080'
+  $dashboard_auth_file   = '/usr/share/puppet-dashboard/config/.htaccess'
   $passenger             = false
-  $mysql_root_pw         = 'changemetoo'
   $rails_base_uri        = '/'
   $rack_version          = '1.1.2'
 
@@ -33,8 +34,6 @@ class dashboard::params {
       $dashboard_service      = 'puppet-dashboard'
       $dashboard_package      = 'puppet-dashboard'
       $dashboard_root         = '/usr/share/puppet-dashboard'
-      $mysql_package_provider = 'yum'
-      $ruby_mysql_package     = 'ruby-mysql'
     }
 
     'Debian': {
@@ -42,8 +41,6 @@ class dashboard::params {
       $dashboard_service      = 'puppet-dashboard'
       $dashboard_package      = 'puppet-dashboard'
       $dashboard_root         = '/usr/share/puppet-dashboard'
-      $mysql_package_provider = 'aptitude'
-      $ruby_mysql_package     = 'libmysql-ruby1.8'
     }
 
     default: {

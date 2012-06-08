@@ -14,11 +14,14 @@
 #   [*dashboard_group*]
 #     - Name of the puppet-dashboard group
 #
-#   [*dashbaord_password*]
+#   [*dashboard_password*]
 #     - Password for the puppet-dashboard database use
 #
 #   [*dashboard_db*]
 #     - The puppet-dashboard database name
+#
+#   [*dashboard_db_host*]
+#     - The database server. Defaults to localhost
 #
 #   [*dashboard_charset*]
 #     - Character set for the puppet-dashboard database
@@ -29,25 +32,21 @@
 #   [*dashboard_port*]
 #     - The port on which puppet-dashboard should run
 #
-#   [*mysql_root_pw*]
-#     - Password for root on MySQL
-#
 #   [*passenger*]
 #     - Boolean to determine whether Dashboard is to be
 #       used with Passenger
-#
-#   [*mysql_package_provider*]
-#     - The package provider to use when installing
-#       the ruby-mysql package
-#
-#   [*ruby_mysql_package*]
-#     - The package name for the ruby-mysql package
 #
 #   [*dashboard_config*]
 #     - The Dashboard configuration file
 #
 #   [*dashboard_root*]
 #     - The path to the Puppet Dashboard library
+#
+#   [*dashboard_auth_file*]
+#     - Full path to the htaccess file for apache htaccess authentication
+#     - Used with Passenger
+#     - Defaults to '/usr/share/puppet-dashboard/.htaccess'
+#     - Requires htaccess module to create the file
 #
 #   [*rack_version*]
 #     - The version of the rack gem to install
@@ -61,56 +60,57 @@
 # Apache::Vhost[$dashboard_site]
 #
 # Sample Usage:
-#   class {'dashboard':
-#     dashboard_ensure       => 'present',
-#     dashboard_user         => 'puppet-dbuser',
-#     dashboard_group        => 'puppet-dbgroup',
-#     dashboard_password     => 'changemme',
-#     dashboard_db           => 'dashboard_prod',
-#     dashboard_charset      => 'utf8',
-#     dashboard_site         => $fqdn,
-#     dashboard_port         => '8080',
-#     mysql_root_pw          => 'REALLY_change_me',
-#     passenger              => true,
-#   }
+#    node default {
+#      class {'mysql::server': }
+#      class { 'dashboard::db::mysql':
+#        db_name     => 'puppet_dashboard',
+#        db_user     => 'puppet-dbuser',
+#        db_password => 'changeme',
+#        host        => 'localhost',
+#      }
+#      class {'apache': }
+#      class {'dashboard':
+#        dashboard_ensure          => 'present',
+#        dashboard_user            => 'puppet-dbuser',
+#        dashboard_group           => 'puppet-dbgroup',
+#        dashboard_password        => 'changeme',
+#        dashboard_db              => 'dashboard_prod',
+#        dashboard_site            => $fqdn,
+#        dashboard_port            => '8080',
+#        passenger                 => true,
+#      }
+#    }
 #
 #  Note: SELinux on Redhat needs to be set separately to allow access to the
 #   puppet-dashboard.
 #
 class dashboard (
-  $dashboard_ensure         = $dashboard::params::dashboard_ensure,
-  $dashboard_user           = $dashboard::params::dashboard_user,
-  $dashboard_group          = $dashboard::params::dashboard_group,
-  $dashboard_password       = $dashboard::params::dashboard_password,
-  $dashboard_db             = $dashboard::params::dashboard_db,
-  $dashboard_charset        = $dashboard::params::dashboard_charset,
-  $dashboard_site           = $dashboard::params::dashboard_site,
-  $dashboard_port           = $dashboard::params::dashboard_port,
-  $dashboard_config         = $dashboard::params::dashboard_config,
-  $mysql_root_pw            = $dashboard::params::mysql_root_pw,
-  $passenger                = $dashboard::params::passenger,
-  $mysql_package_provider   = $dashboard::params::mysql_package_provider,
-  $ruby_mysql_package       = $dashboard::params::ruby_mysql_package,
-  $dashboard_config         = $dashboard::params::dashboard_config,
-  $dashboard_root           = $dashboard::params::dashboard_root,
-  $rack_version             = $dashboard::params::rack_version
+  $dashboard_ensure         = $::dashboard::params::dashboard_ensure,
+  $dashboard_user           = $::dashboard::params::dashboard_user,
+  $dashboard_group          = $::dashboard::params::dashboard_group,
+  $dashboard_password       = $::dashboard::params::dashboard_password,
+  $dashboard_db             = $::dashboard::params::dashboard_db,
+  $dashboard_db_host        = $::dashboard::params::dashboard_db_host,
+  $dashboard_charset        = $::dashboard::params::dashboard_charset,
+  $dashboard_site           = $::dashboard::params::dashboard_site,
+  $dashboard_port           = $::dashboard::params::dashboard_port,
+  $dashboard_config         = $::dashboard::params::dashboard_config,
+  $dashboard_root           = $::dashboard::params::dashboard_root,
+  $dashboard_auth_file      = $::dashboard::params::dashboard_auth_file,
+  $passenger                = $::dashboard::params::passenger,
+  $rack_version             = $::dashboard::params::rack_version
 ) inherits dashboard::params {
-
-  require mysql
-  class { 'mysql::server':
-    config_hash => { 'root_password' => $mysql_root_pw }
-  }
-  class { 'mysql::ruby':
-    package_provider => $mysql_package_provider,
-    package_name     => $ruby_mysql_package,
-  }
 
   if $passenger {
     class { 'dashboard::passenger':
-      dashboard_site   => $dashboard_site,
-      dashboard_port   => $dashboard_port,
-      dashboard_config => $dashboard_config,
-      dashboard_root   => $dashboard_root,
+      dashboard_site      => $dashboard_site,
+      dashboard_port      => $dashboard_port,
+      dashboard_config    => $dashboard_config,
+      dashboard_root      => $dashboard_root,
+      dashboard_user      => $dashboard_user,
+      dashboard_group     => $dashboard_group,
+      dashboard_password  => $dashboard_password,
+      dashboard_auth_file => $dashboard_auth_file,
     }
   } else {
     file { 'dashboard_config':
@@ -156,7 +156,7 @@ class dashboard (
     require => Package[$dashboard_package],
   }
 
-  file { [ "${dashboard::params::dashboard_root}/public", "${dashboard::params::dashboard_root}/tmp", "${dashboard::params::dashboard_root}/log", '/etc/puppet-dashboard' ]:
+  file { [ "${::dashboard::params::dashboard_root}/public", "${::dashboard::params::dashboard_root}/tmp", "${::dashboard::params::dashboard_root}/log", '/etc/puppet-dashboard', "${::dashboard::params::dashboard_root}/spool" ]:
     ensure       => directory,
     recurse      => true,
     recurselimit => '1',
@@ -167,12 +167,12 @@ class dashboard (
     content => template('dashboard/database.yml.erb'),
   }
 
-  file { "${dashboard::params::dashboard_root}/config/database.yml":
+  file { "${::dashboard::params::dashboard_root}/config/database.yml":
     ensure => 'symlink',
     target => '/etc/puppet-dashboard/database.yml',
   }
 
-  file { [ "${dashboard::params::dashboard_root}/log/production.log", "${dashboard::params::dashboard_root}/config/environment.rb" ]:
+  file { [ "${::dashboard::params::dashboard_root}/log/production.log", "${::dashboard::params::dashboard_root}/config/environment.rb" ]:
     ensure => file,
     mode   => '0644',
   }
@@ -186,18 +186,12 @@ class dashboard (
   }
 
   exec { 'db-migrate':
-    command => 'rake RAILS_ENV=production db:migrate',
-    cwd     => $dashboard::params::dashboard_root,
-    path    => '/usr/bin/:/usr/local/bin/',
-    creates => "/var/lib/mysql/${dashboard_db}/nodes.frm",
-    require => [Package[$dashboard_package], Mysql::Db[$dashboard_db],
-                File["${dashboard::params::dashboard_root}/config/database.yml"]],
-  }
-
-  mysql::db { $dashboard_db:
-    user     => $dashboard_user,
-    password => $dashboard_password,
-    charset  => $dashboard_charset,
+    command     => 'rake RAILS_ENV=production db:migrate',
+    cwd         => $::dashboard::params::dashboard_root,
+    path        => '/usr/bin/:/usr/local/bin/',
+    require     => [Package[$dashboard_package], 
+                   File["${::dashboard::params::dashboard_root}/config/database.yml"]],
+    unless      => "mysql -u${dashboard_user} -p${dashboard_password} -h${dashboard_db_host} -e \"describe nodes\" ${dashboard_db}",
   }
 
   user { $dashboard_user:
@@ -212,5 +206,6 @@ class dashboard (
   group { $dashboard_group:
       ensure => 'present',
   }
+
 }
 

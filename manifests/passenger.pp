@@ -15,6 +15,20 @@
 #   [*dashboard_root*]
 #     - The path to the Puppet Dashboard library
 #
+#   [*dashboard_user*]
+#     - Name of the puppet-dashboard database and
+#       system user
+#
+#   [*dashboard_group*]
+#     - Name of the puppet-dashboard group
+#
+#   [*dashboard_password*]
+#     - Password for the puppet-dashboard database use
+#
+#   [*dashboard_auth_file*]
+#     - Full path to the htaccess file for apache htaccess authentication
+#     - Requires htaccess module to create the file
+#
 # Actions:
 #
 # Requires:
@@ -25,7 +39,11 @@ class dashboard::passenger (
   $dashboard_site,
   $dashboard_port,
   $dashboard_config,
-  $dashboard_root
+  $dashboard_root,
+  $dashboard_user,
+  $dashboard_group,
+  $dashboard_password,
+  $dashboard_auth_file
 ) inherits dashboard {
 
   require ::passenger
@@ -46,4 +64,19 @@ class dashboard::passenger (
     docroot  => "${dashboard_root}/public",
     template => 'dashboard/passenger-vhost.erb',
   }
+
+  file { $dashboard_auth_file:
+    ensure => present,
+    owner  => $dashboard_user,
+    group  => $dashboard_group,
+    mode   => '0644',
+  }
+
+  httpauth { $dashboard_user:
+    password   => $dashboard_password,
+    file       => $dashboard_auth_file,
+    mechanism  => basic,
+    ensure     => present,
+  }
+
 }

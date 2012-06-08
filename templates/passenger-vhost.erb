@@ -1,18 +1,31 @@
-Listen <%= dashboard_port %>
+Listen <%= scope.lookupvar("::dashboard::passenger::dashboard_port") %>
 
-<VirtualHost *:<%= dashboard_port %>>
+<VirtualHost *:<%= scope.lookupvar("::dashboard::passenger::dashboard_port") %>>
   ServerName <%= name %>
   DocumentRoot <%= docroot %>
-  RailsBaseURI <%= rails_base_uri %>
+  RailsBaseURI <%= scope.lookupvar("::dashboard::params::rails_base_uri") %>
   <Directory <%= docroot %>>
     Options None
     AllowOverride AuthConfig
     Order allow,deny
     allow from all
   </Directory>
-  ErrorLog /var/log/<%= scope.lookupvar("apache::params::apache_name") %>/<%= name %>_error.log
+  ErrorLog /var/log/<%= scope.lookupvar("::apache::params::apache_name") %>/<%= name %>_error.log
   LogLevel warn
-  CustomLog /var/log/<%= scope.lookupvar("apache::params::apache_name") %>/<%= name %>_access.log combined
+  CustomLog /var/log/<%= scope.lookupvar("::apache::params::apache_name") %>/<%= name %>_access.log combined
   ServerSignature On
+ <Location /reports>
+   Order allow,deny
+   Allow from localhost
+   Allow from <%= @fqdn %>
+   Satisfy any
+ </Location>
+ <Location "/">
+   AuthType basic
+   AuthName "Puppet Dashboard"
+   Require valid-user
+   AuthBasicProvider file
+   AuthUserFile <%= scope.lookupvar("::dashboard::passenger::dashboard_auth_file") %>
+  </Location>
 </VirtualHost>
 
